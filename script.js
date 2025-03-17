@@ -4,6 +4,9 @@ let isConnected = false;
 let currentChatType = null;
 let localStream = null;
 let peerConnection = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY = 3000; // 3 seconds
 
 // DOM Elements
 const welcomeScreen = document.querySelector('.welcome-screen');
@@ -15,10 +18,16 @@ const closeSettingsBtn = document.querySelector('.close-btn');
 
 // Initialize WebSocket connection
 function connectWebSocket() {
-    ws = new WebSocket('ws://localhost:3000');
+    // Get the current host and protocol
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}`;
+    
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
         isConnected = true;
+        reconnectAttempts = 0;
         console.log('Connected to server');
         updateUIForConnection();
     };
@@ -32,12 +41,30 @@ function connectWebSocket() {
         isConnected = false;
         console.log('Disconnected from server');
         handleDisconnect();
+        attemptReconnect();
     };
 
     ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         handleDisconnect();
     };
+}
+
+// Reconnection mechanism
+function attemptReconnect() {
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+        
+        setTimeout(() => {
+            if (!isConnected) {
+                connectWebSocket();
+            }
+        }, RECONNECT_DELAY);
+    } else {
+        console.log('Max reconnection attempts reached');
+        displaySystemMessage('Connection failed. Please refresh the page to try again.');
+    }
 }
 
 // Handle WebSocket messages
